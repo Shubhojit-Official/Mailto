@@ -6,6 +6,7 @@ const userRouter = require("./route/user")
 const clientInfoRouter = require("./route/clientInfo")
 const workspaceRouter = require("./route/workspace")
 const contextRouter = require("./route/context")
+const mailRouter = require("./route/mail")
 
 const app = express()
 app.use(cors())
@@ -15,8 +16,8 @@ app.use("/api/v1/user", userRouter)
 app.use("/api/v1/client", clientInfoRouter)
 app.use("/api/v1/workspace", workspaceRouter)
 app.use("/api/v1/context", contextRouter)
-/*app.use("/api/v1/mail", mailRouter)
-app.use("/api/v1/status", mailStatusRouter)
+app.use("/api/v1/mail", mailRouter)
+/*app.use("/api/v1/status", mailStatusRouter)
 app.use("/api/v1/send", sendRouter)*/
 
 const main = async () => {
