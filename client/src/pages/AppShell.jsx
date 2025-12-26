@@ -9,6 +9,7 @@ export default function AppShell() {
 
   const [workspaces, setWorkspaces] = useState([]);
   const [activeWorkspaceId, setActiveWorkspaceId] = useState(null);
+  const [showContextModal, setShowContextModal] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

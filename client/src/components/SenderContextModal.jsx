@@ -1,13 +1,20 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { apiRequest } from "@/lib/api";
 
 /**
  * SenderContextModal
- * Generic popup modal for defining sender context.
- * Can be triggered from any button (sidebar, main workspace, etc.)
+ * Backend-wired version (UI unchanged)
  */
-export default function SenderContextModal({ isOpen, onClose, onSave }) {
+export default function SenderContextModal({
+  isOpen,
+  onClose,
+  workspaceId,
+  onSaved,
+}) {
   const [intent, setIntent] = useState("sell");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const [sellData, setSellData] = useState({
     product: "",
@@ -29,15 +36,33 @@ export default function SenderContextModal({ isOpen, onClose, onSave }) {
     contribution: "",
   });
 
-  const handleSave = () => {
-    let payload;
+  const handleSave = async () => {
+    setError("");
 
-    if (intent === "sell") payload = { intent, ...sellData };
-    if (intent === "job") payload = { intent, ...jobData };
-    if (intent === "collab") payload = { intent, ...collabData };
+    let intentData;
+    if (intent === "sell") intentData = sellData;
+    if (intent === "job") intentData = jobData;
+    if (intent === "collab") intentData = collabData;
 
-    onSave?.(payload);
-    onClose?.();
+    try {
+      setLoading(true);
+
+      await apiRequest("/context", {
+        method: "POST",
+        body: JSON.stringify({
+          workspaceId,
+          intent,
+          ...intentData,
+        }),
+      });
+
+      onSaved?.();
+      onClose?.();
+    } catch (err) {
+      setError(err.message || "Failed to save context");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -185,18 +210,24 @@ export default function SenderContextModal({ isOpen, onClose, onSave }) {
                     label="What do you bring to the table?"
                     value={collabData.contribution}
                     onChange={(v) =>
-                      setCollabData({ ...collabData, contribution: v })
+                      setCollabData({
+                        ...collabData,
+                        contribution: v,
+                      })
                     }
                   />
                 </motion.div>
               )}
             </AnimatePresence>
 
+            {error && <p className="text-sm text-red-400">{error}</p>}
+
             <button
               onClick={handleSave}
-              className="w-full bg-zinc-100 text-zinc-900 py-3 rounded-xl font-medium"
+              disabled={loading}
+              className="w-full bg-zinc-100 text-zinc-900 py-3 rounded-xl font-medium hover:cursor-pointer disabled:opacity-60"
             >
-              Save Context
+              {loading ? "Saving..." : "Save Context"}
             </button>
           </motion.div>
         </motion.div>
@@ -204,6 +235,8 @@ export default function SenderContextModal({ isOpen, onClose, onSave }) {
     </AnimatePresence>
   );
 }
+
+/* ---------- INPUTS (UNCHANGED) ---------- */
 
 function Input({ label, value, onChange }) {
   return (
