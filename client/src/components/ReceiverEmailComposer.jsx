@@ -1,212 +1,250 @@
-import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Pencil, Copy, Check, Save } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Copy, Pencil, Check, X } from "lucide-react";
+import ToneSliders from "./ToneSliders";
 
 export default function ReceiverEmailComposer({
-  senderContext,
   isOpen,
+  mode,
+  senderContext,
+  recipient,
   onClose,
-  onSave,
-  mode = "compose", // "compose" | "view"
-  initialData,
+  onSaveDraft,
+  onSend,
 }) {
-  const [handle, setHandle] = useState("");
+  const [xHandle, setXHandle] = useState("");
   const [notes, setNotes] = useState("");
   const [email, setEmail] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
+  const [generated, setGenerated] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  const [tone, setTone] = useState({
+    personalization: 70,
+    formality: 50,
+    persuasiveness: 60,
+  });
+
+  /* Populate when opening */
   useEffect(() => {
-    if (mode === "view" && initialData) {
-      setHandle(initialData.xHandle);
-      setEmail(initialData.email);
-      setNotes(initialData.notes || "");
+    if (!recipient) {
+      setXHandle("");
+      setNotes("");
+      setEmail(null);
+      setGenerated(false);
+      setEditing(false);
+      return;
     }
-  }, [mode, initialData]);
 
-  const generateEmail = async () => {
-    if (!handle || !senderContext) return;
+    setXHandle(recipient.xHandle);
+    setNotes(recipient.notes || "");
+    setEmail(recipient.email);
+    setGenerated(true);
+    setEditing(false);
+  }, [recipient]);
 
-    setLoading(true);
-    setIsEditing(false);
+  if (!isOpen) return null;
 
-    setTimeout(() => {
-      setEmail({
-        subject: "Quick thought on something you shared recently",
-        body: `Hi @${handle},\n\nI noticed your recent thoughts and felt it was worth reaching out.\n\n${
-          senderContext.value || ""
-        }\n\n${notes ? notes + "\n\n" : ""}Best,\nShubhojit`,
-      });
-      setLoading(false);
-    }, 1200);
+  const generate = () => {
+    if (!xHandle || !senderContext) return;
+
+    setEmail({
+      to: email?.to || "",
+      subject: "Quick thought on something you shared",
+      body: `Hi @${xHandle},\n\n${senderContext.value}\n\nBest,\nShubhojit`,
+      status: "draft",
+    });
+
+    setGenerated(true);
   };
 
   const handleCopy = async () => {
     if (!email) return;
     await navigator.clipboard.writeText(`${email.subject}\n\n${email.body}`);
     setCopied(true);
-    setTimeout(() => setCopied(false), 1200);
-  };
-
-  const handleSave = () => {
-    if (!email) return;
-
-    onSave({
-      receiverHandle: handle,
-      email,
-      notes,
-    });
-
-    setHandle("");
-    setNotes("");
-    setEmail(null);
-    setIsEditing(false);
-    onClose();
+    setTimeout(() => setCopied(false), 1000);
   };
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <motion.div
-          className="fixed inset-0 z-50 flex items-center justify-center"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-        >
-          {/* Backdrop */}
-          <div className="absolute inset-0 bg-black/60" onClick={onClose} />
+    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center">
+      <div className="bg-zinc-900 w-full max-w-6xl rounded-2xl p-6 relative">
+        {/* HEADER */}
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="font-semibold">
+            {mode === "compose" ? "Compose Email" : "View Email"}
+          </h2>
 
-          {/* Modal */}
-          <motion.div
-            initial={{ scale: 0.92, y: 30 }}
-            animate={{ scale: 1, y: 0 }}
-            exit={{ scale: 0.92, y: 30 }}
-            transition={{ type: "spring", stiffness: 500, damping: 32 }}
-            className="relative w-full max-w-5xl bg-zinc-900 border border-zinc-800 rounded-2xl p-8"
+          <button
+            onClick={onClose}
+            className="p-1 rounded hover:bg-zinc-800 hover:cursor-pointer transition"
           >
-            {/* Header */}
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-semibold">
-                {mode === "compose" ? "Compose Email" : "View Email"}
-              </h2>
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="grid grid-cols-[360px_1fr] gap-6">
+          {/* LEFT PANEL */}
+          {mode === "compose" && (
+            <div className="space-y-5">
+              {/* X HANDLE */}
+              <div>
+                <label className="text-xs text-zinc-400">X Handle</label>
+                <input
+                  value={xHandle}
+                  onChange={(e) => setXHandle(e.target.value)}
+                  className="w-full bg-zinc-800 p-2 rounded mt-1"
+                />
+              </div>
+
+              {/* EMAIL */}
+              <div>
+                <label className="text-xs text-zinc-400">Recipient Email</label>
+                <input
+                  value={email?.to || ""}
+                  onChange={(e) =>
+                    setEmail((p) => ({
+                      ...(p || {}),
+                      to: e.target.value,
+                    }))
+                  }
+                  className="w-full bg-zinc-800 p-2 rounded mt-1"
+                />
+              </div>
+
+              {/* NOTES */}
+              <div>
+                <label className="text-xs text-zinc-400">Notes</label>
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  className="w-full bg-zinc-800 p-2 rounded mt-1 min-h-30 resize-none"
+                />
+              </div>
+
+              {/* TONE SLIDERS */}
+              <div className="border border-zinc-800 rounded-xl p-4">
+                <h4 className="text-xs text-zinc-400 mb-3">Tone Controls</h4>
+                <ToneSliders values={tone} onChange={setTone} />
+              </div>
+
+              {/* GENERATE */}
               <button
-                onClick={onClose}
-                className="text-zinc-400 hover:text-zinc-200"
+                onClick={generate}
+                className="w-full bg-white text-black py-2 rounded
+                           hover:bg-zinc-200 hover:cursor-pointer
+                           active:scale-[0.98]
+                           transition-all duration-150"
               >
-                ✕
+                {generated ? "Regenerate" : "Generate"}
               </button>
             </div>
+          )}
 
-            <div className="grid grid-cols-[360px_1fr] gap-6 items-start">
-              {/* LEFT PANEL */}
-              {mode === "compose" && (
-                <div
-                  className={loading ? "opacity-50 pointer-events-none" : ""}
+          {/* RIGHT PANEL */}
+          {generated && email && (
+            <div className="space-y-4">
+              {/* TOOLBAR */}
+              <div className="flex justify-end items-center gap-4">
+                {mode === "compose" && (
+                  <button
+                    onClick={() => setEditing((v) => !v)}
+                    className={`text-xs flex items-center gap-1
+                      hover:cursor-pointer transition
+                      ${
+                        editing
+                          ? "text-green-400"
+                          : "text-zinc-400 hover:text-zinc-200"
+                      }`}
+                  >
+                    <Pencil size={14} />
+                    {editing ? "Editing" : "Edit"}
+                  </button>
+                )}
+
+                <button
+                  onClick={handleCopy}
+                  className="text-zinc-400 hover:text-zinc-200
+                             hover:cursor-pointer
+                             flex items-center gap-1 transition"
                 >
-                  <label className="text-xs text-zinc-400">X Handle</label>
-                  <div className="flex items-center bg-zinc-800 border border-zinc-700 rounded-xl mt-1">
-                    <span className="px-3 text-zinc-500">@</span>
-                    <input
-                      className="flex-1 bg-transparent p-3 text-sm outline-none"
-                      value={handle}
-                      onChange={(e) =>
-                        setHandle(e.target.value.replace(/^@/, ""))
-                      }
-                    />
-                  </div>
+                  {copied ? <Check size={14} /> : <Copy size={14} />}
+                  {copied && <span className="text-xs">Copied</span>}
+                </button>
+              </div>
 
-                  <label className="text-xs text-zinc-400 mt-4 block">
-                    Additional notes
-                  </label>
-                  <textarea
-                    className="w-full bg-zinc-800 border border-zinc-700 rounded-xl p-3 text-sm h-24 resize-none mt-1"
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                  />
+              {/* SUBJECT */}
+              <input
+                value={email.subject}
+                readOnly={!editing || mode === "view"}
+                onChange={(e) =>
+                  setEmail({ ...email, subject: e.target.value })
+                }
+                className={`w-full bg-transparent text-sm font-medium outline-none ${
+                  editing ? "border-b border-zinc-600 pb-1" : ""
+                }`}
+              />
+
+              {/* BODY */}
+              <textarea
+                value={email.body}
+                readOnly={!editing || mode === "view"}
+                onChange={(e) => setEmail({ ...email, body: e.target.value })}
+                className={`w-full h-72 bg-transparent outline-none resize-none ${
+                  editing ? "border border-zinc-700 rounded-lg p-2" : ""
+                }`}
+              />
+
+              {/* ACTIONS */}
+              {mode === "compose" && (
+                <div className="flex gap-2">
+                  <button
+                    onClick={() =>
+                      onSaveDraft({
+                        recipient,
+                        xHandle,
+                        notes,
+                        tone,
+                        email: { ...email, status: "draft" },
+                      })
+                    }
+                    className="flex-1 bg-zinc-800 py-2 rounded
+                               hover:bg-zinc-700 hover:cursor-pointer
+                               active:scale-[0.98]
+                               transition-all duration-150"
+                  >
+                    Save Draft
+                  </button>
 
                   <button
-                    onClick={generateEmail}
-                    className="mt-4 w-full bg-zinc-100 text-zinc-900 py-3 rounded-xl font-medium"
+                    onClick={() =>
+                      onSend({
+                        recipient,
+                        xHandle,
+                        notes,
+                        tone,
+                        email: {
+                          ...email,
+                          status: "sent",
+                          sentAt: new Date().toISOString(),
+                        },
+                      })
+                    }
+                    className="flex-1 bg-white text-black py-2 rounded
+                               hover:bg-zinc-200 hover:cursor-pointer
+                               active:scale-[0.98]
+                               transition-all duration-150"
                   >
-                    {loading
-                      ? "Generating…"
-                      : email
-                      ? "Regenerate"
-                      : "Generate"}
+                    Send Email
                   </button>
                 </div>
               )}
 
-              {/* RIGHT PANEL */}
-              {email && (
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-zinc-300">Draft</span>
-
-                    <div className="flex gap-4">
-                      {mode === "compose" && (
-                        <button
-                          onClick={() => setIsEditing((v) => !v)}
-                          className="text-xs text-zinc-400 hover:text-zinc-200 flex items-center gap-1"
-                        >
-                          <Pencil size={14} />
-                          {isEditing ? "Done" : "Edit"}
-                        </button>
-                      )}
-
-                      <button
-                        onClick={handleCopy}
-                        className="text-zinc-400 hover:text-zinc-200"
-                      >
-                        {copied ? <Check size={16} /> : <Copy size={16} />}
-                      </button>
-                    </div>
-                  </div>
-
-                  <input
-                    value={email.subject}
-                    readOnly={mode === "view" || !isEditing}
-                    onBlur={() => setIsEditing(false)}
-                    onChange={(e) =>
-                      setEmail({ ...email, subject: e.target.value })
-                    }
-                    className={`w-full rounded-xl p-3 text-sm ${
-                      isEditing
-                        ? "bg-zinc-800 border border-zinc-700"
-                        : "bg-transparent"
-                    }`}
-                  />
-
-                  <textarea
-                    value={email.body}
-                    readOnly={mode === "view" || !isEditing}
-                    onBlur={() => setIsEditing(false)}
-                    onChange={(e) =>
-                      setEmail({ ...email, body: e.target.value })
-                    }
-                    className={`w-full h-80 rounded-xl p-3 text-sm resize-none ${
-                      isEditing
-                        ? "bg-zinc-800 border border-zinc-700"
-                        : "bg-transparent"
-                    }`}
-                  />
-
-                  {mode === "compose" && (
-                    <button
-                      onClick={handleSave}
-                      className="w-full bg-zinc-100 text-zinc-900 py-3 rounded-xl font-medium flex items-center justify-center gap-2"
-                    >
-                      <Save size={16} />
-                      Save to Workspace
-                    </button>
-                  )}
-                </div>
+              {mode === "view" && (
+                <div className="text-xs text-zinc-400">To: {email.to}</div>
               )}
             </div>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
