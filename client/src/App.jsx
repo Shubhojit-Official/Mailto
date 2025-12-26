@@ -3,8 +3,41 @@ import Sidebar from "./components/Sidebar";
 import WorkspacePage from "./pages/WorkspacePage";
 import { loadAppState, saveAppState } from "./lib/storage";
 
+const DEFAULT_COLORS = ["blue", "green", "purple", "orange", "pink", "teal"];
+
 export default function App() {
-  const [appState, setAppState] = useState(() => loadAppState());
+  const [appState, setAppState] = useState(() => {
+    const stored = loadAppState();
+
+    // FIRST BOOT: no workspace → create one
+    if (
+      !stored ||
+      !stored.workspaces ||
+      Object.keys(stored.workspaces).length === 0
+    ) {
+      const id = crypto.randomUUID();
+      const color =
+        DEFAULT_COLORS[Math.floor(Math.random() * DEFAULT_COLORS.length)];
+
+      return {
+        activeWorkspaceId: id,
+        workspaces: {
+          [id]: {
+            workspace: {
+              id,
+              name: "My First Workspace",
+              color,
+            },
+            senderContext: null,
+            recipients: [],
+            emails: [],
+          },
+        },
+      };
+    }
+
+    return stored;
+  });
 
   useEffect(() => {
     saveAppState(appState);
@@ -12,6 +45,8 @@ export default function App() {
 
   const { workspaces, activeWorkspaceId } = appState;
   const activeWorkspace = workspaces[activeWorkspaceId];
+
+  /* ---------------- ACTIONS ---------------- */
 
   const createWorkspace = ({ name, color }) => {
     const id = crypto.randomUUID();
@@ -22,7 +57,11 @@ export default function App() {
       workspaces: {
         ...prev.workspaces,
         [id]: {
-          workspace: { id, name, color },
+          workspace: {
+            id,
+            name,
+            color,
+          },
           senderContext: null,
           recipients: [],
           emails: [],
@@ -48,20 +87,7 @@ export default function App() {
     }));
   };
 
-  if (!activeWorkspace) {
-    return (
-      <div className="min-h-screen bg-zinc-950 text-zinc-100 flex items-center justify-center">
-        <button
-          onClick={() =>
-            setAppState({ workspaces: {}, activeWorkspaceId: null })
-          }
-          className="px-4 py-2 bg-white text-black rounded"
-        >
-          Create your first workspace
-        </button>
-      </div>
-    );
-  }
+  /* ---------------- RENDER ---------------- */
 
   return (
     <div className="flex h-screen bg-zinc-950 text-zinc-100">
