@@ -1,41 +1,37 @@
 const mongoose = require("mongoose");
 
-const contextSchema = new mongoose.Schema({
-  workspaceId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "Workspace",
-    required: true,
+const senderContextSchema = new mongoose.Schema(
+  {
+    workspaceId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Workspace",
+      required: true,
+      unique: true, // ensures 1 context per workspace
+      index: true,
+    },
+
+    intent: {
+      type: String,
+      enum: ["pitch", "job", "collaboration"],
+      required: true,
+    },
+
+    summary: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 3000,
+    },
+
+    additionalNotes: {
+      type: String,
+      trim: true,
+      maxlength: 3000,
+    },
   },
+  {
+    timestamps: true, // creates createdAt + updatedAt
+  }
+);
 
-  mode: {
-    type: String,
-    enum: ["pitch", "job", "collaboration"],
-    required: true,
-  },
-
-  // Universal fields
-  coreValue: String,
-  proof: String,
-
-  // Pitch fields
-  whatSelling: String,
-  targetAudience: String,
-
-  // Job outreach fields
-  roleSeeking: String,
-  skills: String,
-  experience: String,
-  whyYou: String,
-
-  // Collaboration fields
-  collabIdea: String,
-  whyThem: String,
-  whatYouProvide: String,
-
-  updatedAt: {
-    type: Date,
-    default: Date.now,
-  },
-});
-
-module.exports = mongoose.model("Context", contextSchema);
+module.exports = mongoose.model("SenderContext", senderContextSchema);
