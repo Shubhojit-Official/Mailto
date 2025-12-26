@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Sidebar from "@/components/Sidebar";
 import WorkspacePage from "@/pages/WorkspacePage";
+import SenderContextModal from "@/components/SenderContextModal";
 import { apiRequest } from "@/lib/api";
 
 export default function AppShell() {
@@ -12,6 +13,7 @@ export default function AppShell() {
   const [showContextModal, setShowContextModal] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  /* ---------- LOAD WORKSPACES ---------- */
   useEffect(() => {
     async function load() {
       try {
@@ -19,7 +21,7 @@ export default function AppShell() {
         const list = Array.isArray(res) ? res : res.workspaces || [];
 
         if (!list.length) {
-          navigate("/onboarding/workspace");
+          navigate("/onboarding/workspace", { replace: true });
           return;
         }
 
@@ -36,6 +38,12 @@ export default function AppShell() {
     load();
   }, [navigate]);
 
+  /* ---------- CLOSE MODALS ON WORKSPACE SWITCH ---------- */
+  useEffect(() => {
+    setShowContextModal(false);
+  }, [activeWorkspaceId]);
+
+  /* ---------- LOGOUT ---------- */
   const handleLogout = () => {
     localStorage.removeItem("token");
     setWorkspaces([]);
@@ -43,6 +51,7 @@ export default function AppShell() {
     navigate("/login", { replace: true });
   };
 
+  /* ---------- LOADING STATE ---------- */
   if (loading) {
     return (
       <div className="h-screen bg-zinc-950 flex items-center justify-center text-zinc-400">
@@ -51,19 +60,28 @@ export default function AppShell() {
     );
   }
 
+  /* ---------- ACTIVE WORKSPACE GUARD ---------- */
   const activeWorkspace = workspaces.find((w) => w._id === activeWorkspaceId);
 
   if (!activeWorkspace) return null;
 
+  /* ---------- RENDER ---------- */
   return (
     <div className="flex h-screen bg-zinc-950 text-zinc-100">
       <Sidebar
         workspaces={workspaces}
         activeWorkspaceId={activeWorkspaceId}
         onSwitchWorkspace={setActiveWorkspaceId}
-        onAddContext={() => {}}
+        onAddContext={() => setShowContextModal(true)}
         onAddRecipient={() => {}}
         onLogout={handleLogout}
+      />
+
+      <SenderContextModal
+        isOpen={showContextModal}
+        workspaceId={activeWorkspaceId}
+        onClose={() => setShowContextModal(false)}
+        onSaved={() => setShowContextModal(false)}
       />
 
       <main className="flex-1 overflow-y-auto">
