@@ -1,28 +1,36 @@
 import { Clock, MailOpen } from "lucide-react";
+import { useState } from "react";
 
 export default function RecipientCard({ recipient, onClick }) {
   const { xHandle, email, createdAt } = recipient;
 
-  const statusStyles = {
+  const [hasSeenPulse, setHasSeenPulse] = useState(false);
+
+  const statusConfig = {
     draft: {
       badge: "bg-zinc-700/40 text-zinc-300",
       accent: "bg-zinc-500",
+      pulse: false,
     },
     sent: {
       badge: "bg-blue-600/20 text-blue-400",
       accent: "bg-blue-500",
+      pulse: false,
     },
     opened: {
       badge: "bg-green-600/20 text-green-400",
       accent: "bg-green-500",
+      pulse: true,
     },
     replied: {
       badge: "bg-purple-600/20 text-purple-400",
       accent: "bg-purple-500",
+      pulse: true,
     },
   };
 
   const status = email.status || "draft";
+  const shouldPulse = statusConfig[status].pulse && !hasSeenPulse;
 
   const getTimelineText = () => {
     if (email.repliedAt) return "Replied";
@@ -41,6 +49,7 @@ export default function RecipientCard({ recipient, onClick }) {
   return (
     <button
       onClick={onClick}
+      onMouseEnter={() => setHasSeenPulse(true)}
       className="relative w-full max-w-105 text-left
                  bg-zinc-900 border border-zinc-800 rounded-xl
                  p-4 space-y-3
@@ -50,18 +59,31 @@ export default function RecipientCard({ recipient, onClick }) {
     >
       {/* LEFT ACCENT BAR */}
       <div
-        className={`absolute left-0 top-0 h-full w-0.75 rounded-l-xl ${statusStyles[status].accent}`}
+        className={`absolute left-0 top-0 h-full w-0.75 rounded-l-xl ${statusConfig[status].accent}`}
       />
 
       {/* HEADER */}
       <div className="flex justify-between items-center">
         <div className="font-medium text-sm">@{xHandle}</div>
 
-        <span
-          className={`px-2 py-0.5 rounded-md text-[10px] font-medium ${statusStyles[status].badge}`}
-        >
-          {status.toUpperCase()}
-        </span>
+        {/* STATUS BADGE */}
+        <div className="relative">
+          {shouldPulse && (
+            <span
+              className={`absolute inset-0 rounded-md
+                          ${statusConfig[status].accent}
+                          opacity-30 animate-ping`}
+            />
+          )}
+
+          <span
+            className={`relative px-2 py-0.5 rounded-md
+                        text-[10px] font-medium
+                        ${statusConfig[status].badge}`}
+          >
+            {status.toUpperCase()}
+          </span>
+        </div>
       </div>
 
       {/* SUBJECT */}
