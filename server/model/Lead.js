@@ -7,42 +7,26 @@ const leadSchema = new mongoose.Schema({
     required: true
   },
 
+  workspaceId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Workspace",
+    required: true,
+  },
+
   name: {
     type: String,
-    required: true,
   },
 
   email: {
     type: String,
-    required: true,
   },
+
+  twitterHandle: String,
 
   personalitySummary: {
     type: String,
     required: false,
   },
-
-  lastEmailContent: {
-    type: String,
-    required: false,
-  },
-
-  emailSent: {
-    type: Boolean,
-    default: false,
-  },
-  emailOpened: {
-    type: Boolean,
-    default: false,
-  },
-  emailReplied: {
-    type: Boolean,
-    default: false,
-  },
-
-  sentAt: Date,
-  openedAt: Date,
-  repliedAt: Date,
 
   createdAt: {
     type: Date,
