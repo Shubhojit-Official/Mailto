@@ -2,7 +2,7 @@ const axios = require("axios");
 const { Router } = require("express");
 const clientInfoRouter = Router();
 const userMiddleware = require("../middleware/userMiddleware");
-const Lead = require("../model/Lead");
+const Lead = require("../model/Recipient");
 const Workspace = require("../model/Workspace");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 

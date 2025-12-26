@@ -1,67 +1,129 @@
+const express = require("express");
 const Workspace = require("../model/Workspace");
+const SenderContext = require("../model/SenderContext");
+const Recipient = require("../model/Recipient");
+const Email = require("../model/Email");
 const userMiddleware = require("../middleware/userMiddleware");
 
-const Router = require("express")
-const workspaceRouter = Router()
+const router = express.Router();
 
-// Create Workspace
-workspaceRouter.post("/create", userMiddleware, async (req, res) => {
+
+// CREATE WORKSPACE
+router.post("/", userMiddleware, async (req, res) => {
   try {
-    const { name } = req.body;
+    const { name, color } = req.body;
 
     if (!name) {
-      return res.status(400).json({
-        message: "Workspace name is required",
-        code: 400,
-      });
+      return res.status(400).json({ message: "Workspace name is required" });
     }
 
     const workspace = await Workspace.create({
       userId: req.userId,
-      name,
+      name: name.trim(),
+      color: color || "blue",
     });
 
-    return res.status(201).json({
-      message: "Workspace created",
-      workspace,
-      code: 201,
-    });
-
+    return res.status(201).json({ workspace });
   } catch (err) {
-    console.error("Workspace Error:", err.message);
-
-    return res.status(500).json({
-      message: "Internal server error",
-      error: err.message,
-      code: 500,
-    });
+    console.error("Create Workspace Error:", err.message);
+    return res.status(500).json({ message: "Internal server error" });
   }
 });
 
-// Get all workspaces
-workspaceRouter.get("/all", userMiddleware, async (req, res) => {
+
+// GET ALL WORKSPACES FOR USER
+router.get("/", userMiddleware, async (req, res) => {
   try {
-    const userId = req.userId;
+    const workspaces = await Workspace.find({
+      userId: req.userId,
+    }).sort({ updatedAt: -1 });
 
-    const workspaces = await Workspace.find({ userId })
-      .sort({ createdAt: -1 });
+    return res.json(workspaces);
+  } catch (err) {
+    console.error("Fetch Workspaces Error:", err.message);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+});
 
-    return res.status(200).json({
-      message: "Fetched workspaces",
-      count: workspaces.length,
-      workspaces,
-      code: 200,
+
+// GET FULL WORKSPACE DATA
+router.get("/:id", userMiddleware, async (req, res) => {
+  try {
+    const id = req.params.id;
+
+    const workspace = await Workspace.findOne({
+      _id: id,
+      userId: req.userId,
+    });
+
+    if (!workspace) {
+      return res.status(404).json({ message: "Workspace not found" });
+    }
+
+    const [senderContext, recipients, emails] = await Promise.all([
+      SenderContext.findOne({ workspaceId: id }),
+      Recipient.find({ workspaceId: id }),
+      Email.find({ workspaceId: id }),
+    ]);
+
+    return res.json({
+      workspace,
+      senderContext,
+      recipients,
+      emails,
     });
 
   } catch (err) {
     console.error("Workspace Fetch Error:", err.message);
-    return res.status(500).json({
-      message: "Internal server error",
-      error: err.message,
-      code: 500,
-    });
+    return res.status(500).json({ message: "Internal server error" });
   }
 });
 
 
-module.exports = workspaceRouter;
+// UPDATE WORKSPACE
+router.patch("/:id", userMiddleware, async (req, res) => {
+  try {
+    const { name, color } = req.body;
+
+    const workspace = await Workspace.findOne({
+      _id: req.params.id,
+      userId: req.userId,
+    });
+
+    if (!workspace) {
+      return res.status(404).json({ message: "Workspace not found" });
+    }
+
+    if (name !== undefined) workspace.name = name.trim();
+    if (color !== undefined) workspace.color = color;
+
+    await workspace.save();
+
+    return res.json({ workspace });
+  } catch (err) {
+    console.error("Update Workspace Error:", err.message);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+
+// DELETE WORKSPACE
+router.delete("/:id", userMiddleware, async (req, res) => {
+  try {
+    const workspace = await Workspace.findOneAndDelete({
+      _id: req.params.id,
+      userId: req.userId,
+    });
+
+    if (!workspace) {
+      return res.status(404).json({ message: "Workspace not found" });
+    }
+
+    return res.json({ message: "Workspace deleted" });
+  } catch (err) {
+    console.error("Delete Workspace Error:", err.message);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+module.exports = router;
