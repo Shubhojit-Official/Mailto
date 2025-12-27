@@ -38,6 +38,8 @@ router.post("/", userMiddleware, async (req, res) => {
       { workspaceId },
       {
         intent,
+        data: intentData,
+        userId: req.userId,
         summary,
         additionalNotes: additionalNotes || "",
       },
@@ -48,10 +50,34 @@ router.post("/", userMiddleware, async (req, res) => {
       message: "Context saved",
       senderContext: savedContext,
     });
-
   } catch (err) {
     console.error("Context Save Error:", err);
     res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+router.get("/:workspaceId", userMiddleware, async (req, res) => {
+  try {
+    const { workspaceId } = req.params;
+
+    const context = await SenderContext.findOne({
+      workspaceId,
+      userId: req.userId,
+    }).lean();
+
+    if (!context) {
+      return res.status(404).json(null);
+    }
+
+    console.log(context.data);
+
+    res.json({
+      intent: context.intent,
+      data: context.data, // 👈 raw structured data
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to fetch context" });
   }
 });
 

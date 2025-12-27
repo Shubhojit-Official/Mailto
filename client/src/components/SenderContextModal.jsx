@@ -1,11 +1,45 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { apiRequest } from "@/lib/api";
 
-/**
- * SenderContextModal
- * Backend-wired version (UI unchanged)
- */
+/* ---------- INTENT MAPS ---------- */
+
+const UI_TO_BACKEND_INTENT = {
+  sell: "pitch",
+  job: "job",
+  collab: "collaboration",
+};
+
+const BACKEND_TO_UI_INTENT = {
+  pitch: "sell",
+  job: "job",
+  collaboration: "collab",
+};
+
+/* ---------- DEFAULTS ---------- */
+
+const EMPTY_SELL = {
+  product: "",
+  target: "",
+  value: "",
+  proof: "",
+};
+
+const EMPTY_JOB = {
+  role: "",
+  skills: "",
+  experience: "",
+  motivation: "",
+};
+
+const EMPTY_COLLAB = {
+  idea: "",
+  whyThem: "",
+  contribution: "",
+};
+
+/* ---------- COMPONENT ---------- */
+
 export default function SenderContextModal({
   isOpen,
   onClose,
@@ -13,28 +47,69 @@ export default function SenderContextModal({
   onSaved,
 }) {
   const [intent, setIntent] = useState("sell");
+  const [intentLocked, setIntentLocked] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const [sellData, setSellData] = useState({
-    product: "",
-    target: "",
-    value: "",
-    proof: "",
-  });
+  const [sellData, setSellData] = useState(EMPTY_SELL);
+  const [jobData, setJobData] = useState(EMPTY_JOB);
+  const [collabData, setCollabData] = useState(EMPTY_COLLAB);
 
-  const [jobData, setJobData] = useState({
-    role: "",
-    skills: "",
-    experience: "",
-    motivation: "",
-  });
+  /* ---------- PREFILL + LOCK ---------- */
 
-  const [collabData, setCollabData] = useState({
-    idea: "",
-    whyThem: "",
-    contribution: "",
-  });
+  useEffect(() => {
+    if (!isOpen || !workspaceId) return;
+
+    async function loadContext() {
+      try {
+        const res = await apiRequest(`/context/${workspaceId}`);
+        if (!res || !res.intent) return;
+
+        // ✅ FIX: unwrap nested payload safely
+        const payload = res.data?.data || res.data;
+        if (!payload) return;
+
+        const uiIntent = BACKEND_TO_UI_INTENT[res.intent];
+        if (!uiIntent) return;
+
+        setIntent(uiIntent);
+        setIntentLocked(true);
+
+        if (res.intent === "pitch") {
+          setSellData({ ...EMPTY_SELL, ...payload });
+        }
+
+        if (res.intent === "job") {
+          setJobData({ ...EMPTY_JOB, ...payload });
+        }
+
+        if (res.intent === "collaboration") {
+          setCollabData({ ...EMPTY_COLLAB, ...payload });
+        }
+      } catch {
+        // no context yet → do nothing
+      }
+    }
+
+    loadContext();
+  }, [isOpen, workspaceId]);
+
+  /* ---------- RESET ON CLOSE ---------- */
+
+  useEffect(() => {
+    if (!isOpen) {
+      setIntent("sell");
+      setIntentLocked(false);
+      setError("");
+      setLoading(false);
+
+      setSellData(EMPTY_SELL);
+      setJobData(EMPTY_JOB);
+      setCollabData(EMPTY_COLLAB);
+    }
+  }, [isOpen]);
+
+  /* ---------- SAVE ---------- */
 
   const handleSave = async () => {
     setError("");
@@ -44,6 +119,12 @@ export default function SenderContextModal({
     if (intent === "job") intentData = jobData;
     if (intent === "collab") intentData = collabData;
 
+    const backendIntent = UI_TO_BACKEND_INTENT[intent];
+    if (!backendIntent) {
+      setError("Invalid intent selected");
+      return;
+    }
+
     try {
       setLoading(true);
 
@@ -51,8 +132,8 @@ export default function SenderContextModal({
         method: "POST",
         body: JSON.stringify({
           workspaceId,
-          intent,
-          ...intentData,
+          intent: backendIntent,
+          data: intentData,
         }),
       });
 
@@ -65,6 +146,8 @@ export default function SenderContextModal({
     }
   };
 
+  /* ---------- RENDER ---------- */
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -74,10 +157,8 @@ export default function SenderContextModal({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
         >
-          {/* Backdrop */}
           <div className="absolute inset-0 bg-black/60" onClick={onClose} />
 
-          {/* Modal */}
           <motion.div
             initial={{ scale: 0.9, y: 30 }}
             animate={{ scale: 1, y: 0 }}
@@ -110,28 +191,23 @@ export default function SenderContextModal({
               ].map((item) => (
                 <button
                   key={item.key}
-                  onClick={() => setIntent(item.key)}
+                  disabled={intentLocked}
+                  onClick={() => !intentLocked && setIntent(item.key)}
                   className={`px-4 py-2 rounded-xl text-sm transition ${
                     intent === item.key
                       ? "bg-zinc-100 text-zinc-900"
                       : "bg-zinc-800 text-zinc-300"
-                  }`}
+                  } ${intentLocked ? "opacity-60 cursor-not-allowed" : ""}`}
                 >
                   {item.label}
                 </button>
               ))}
             </div>
 
-            {/* Dynamic Forms */}
+            {/* Forms (unchanged UI) */}
             <AnimatePresence mode="wait">
               {intent === "sell" && (
-                <motion.div
-                  key="sell"
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -8 }}
-                  className="space-y-3"
-                >
+                <motion.div key="sell" className="space-y-3">
                   <Input
                     label="What are you selling?"
                     value={sellData.product}
@@ -156,13 +232,7 @@ export default function SenderContextModal({
               )}
 
               {intent === "job" && (
-                <motion.div
-                  key="job"
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -8 }}
-                  className="space-y-3"
-                >
+                <motion.div key="job" className="space-y-3">
                   <Input
                     label="Role you are seeking"
                     value={jobData.role}
@@ -187,13 +257,7 @@ export default function SenderContextModal({
               )}
 
               {intent === "collab" && (
-                <motion.div
-                  key="collab"
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -8 }}
-                  className="space-y-3"
-                >
+                <motion.div key="collab" className="space-y-3">
                   <Textarea
                     label="Collaboration idea"
                     value={collabData.idea}
@@ -210,10 +274,7 @@ export default function SenderContextModal({
                     label="What do you bring to the table?"
                     value={collabData.contribution}
                     onChange={(v) =>
-                      setCollabData({
-                        ...collabData,
-                        contribution: v,
-                      })
+                      setCollabData({ ...collabData, contribution: v })
                     }
                   />
                 </motion.div>
@@ -225,7 +286,7 @@ export default function SenderContextModal({
             <button
               onClick={handleSave}
               disabled={loading}
-              className="w-full bg-zinc-100 text-zinc-900 py-3 rounded-xl font-medium hover:cursor-pointer disabled:opacity-60"
+              className="w-full bg-zinc-100 text-zinc-900 py-3 rounded-xl font-medium disabled:opacity-60"
             >
               {loading ? "Saving..." : "Save Context"}
             </button>
@@ -236,7 +297,7 @@ export default function SenderContextModal({
   );
 }
 
-/* ---------- INPUTS (UNCHANGED) ---------- */
+/* ---------- INPUTS ---------- */
 
 function Input({ label, value, onChange }) {
   return (
