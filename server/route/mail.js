@@ -10,7 +10,7 @@ const nodemailer = require("nodemailer");
 const router = express.Router();
 
 
-// GENERATE EMAIL (DRAFT)
+// GENERATE EMAIL
 router.post("/generate", userMiddleware, async (req, res) => {
   try {
     const { recipientId, workspaceId, personalization, formality, persuasiveness } = req.body;
