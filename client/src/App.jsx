@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import Sidebar from "./components/Sidebar";
 import WorkspacePage from "./pages/WorkspacePage";
 import { loadAppState, saveAppState } from "./lib/storage";
+import { LandingPage } from "./pages/LandingPage";
 
 export default function App() {
   const [appState, setAppState] = useState(() => loadAppState());
@@ -48,7 +49,7 @@ export default function App() {
     }));
   };
 
-  if (!activeWorkspace) {
+  {/*if (!activeWorkspace) {
     return (
       <div className="min-h-screen bg-zinc-950 text-zinc-100 flex items-center justify-center">
         <button
@@ -61,10 +62,10 @@ export default function App() {
         </button>
       </div>
     );
-  }
+  }*/}
 
   return (
-    <div className="flex h-screen bg-zinc-950 text-zinc-100">
+    /*<div className="flex h-screen bg-zinc-950 text-zinc-100">
       <Sidebar
         workspaces={workspaces}
         activeWorkspaceId={activeWorkspaceId}
@@ -80,6 +81,9 @@ export default function App() {
           onChange={(data) => updateWorkspaceData(activeWorkspaceId, data)}
         />
       </main>
-    </div>
+    </div>*/
+    <>
+      <LandingPage />
+    </>
   );
 }
