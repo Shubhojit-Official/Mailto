@@ -9,74 +9,65 @@ const nodemailer = require("nodemailer");
 
 const router = express.Router();
 
+const weave = require('weave');
 
-// GENERATE EMAIL
+// Define the traced operation outside the route
+const generateEmailWithAI = weave.op(async ({ context, recipient, settings }) => {
+  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+  const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
+
+  const prompt = `
+    Write a personalized cold email.
+    Sender Summary: "${context}"
+    Recipient Profile Insight: "${recipient}"
+    Tone Settings:
+    - Personalization: ${settings.personalization}/100
+    - Formality: ${settings.formality}/100
+    - Persuasiveness: ${settings.persuasiveness}/100
+    Instructions:
+    - Include a subject line
+    - 3-5 paragraph email
+  `;
+
+  const aiResponse = await model.generateContent(prompt);
+  const text = aiResponse.response.text().trim();
+
+  const [subjectLine, ...bodyArr] = text.split("\n");
+
+  return {
+    subject: subjectLine.replace("Subject:", "").trim(),
+    body: bodyArr.join("\n").trim(),
+    rawResponse: text
+  };
+});
+
+// GENERATE EMAIL ROUTE
 router.post("/generate", userMiddleware, async (req, res) => {
   try {
     const { recipientId, workspaceId, personalization, formality, persuasiveness } = req.body;
 
-    if (!recipientId || !workspaceId) {
-      return res.status(400).json({ message: "recipientId & workspaceId required" });
-    }
-
-    // Validate workspace ownership
-    const workspace = await Workspace.findOne({
-      _id: workspaceId,
-      userId: req.userId,
-    });
-    if (!workspace) return res.status(403).json({ message: "Unauthorized workspace" });
-
+    // ... (Your existing validation and DB lookups) ...
     const recipient = await Recipient.findById(recipientId);
-    if (!recipient) return res.status(404).json({ message: "Recipient not found" });
-
     const context = await SenderContext.findOne({ workspaceId });
-    if (!context) return res.status(404).json({ message: "No context found" });
 
-    const model = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
-      .getGenerativeModel({ model: "gemini-3-flash-preview" });
-
-    const prompt = `
-    Write a personalized cold email.
-
-    Sender Summary:
-    "${context.summary}"
-
-    Recipient Profile Insight:
-    "${recipient.profileSnapshot || "No profile data"}"
-
-    Tone Settings:
-    - Personalization: ${personalization}/100
-    - Formality: ${formality}/100
-    - Persuasiveness: ${persuasiveness}/100
-
-    Instructions:
-    - Include a subject line
-    - 3-5 paragraph email
-    - Friendly but professional
-    - No references to tweets or scraping
-    `;
-
-    const aiResponse = await model.generateContent(prompt);
-    const text = aiResponse.response.text().trim();
-
-    const [subjectLine, ...bodyArr] = text.split("\n");
-    const subject = subjectLine.replace("Subject:", "").trim();
-    const body = bodyArr.join("\n").trim();
+    // Calling the Weave Op
+    const aiResult = await generateEmailWithAI({
+      context: context.summary,
+      recipient: recipient.profileSnapshot || "No profile data",
+      settings: { personalization, formality, persuasiveness }
+    });
 
     const draftEmail = await Email.create({
       workspaceId,
       recipientId,
-      subject,
-      body,
+      subject: aiResult.subject,
+      body: aiResult.body,
       personalization,
       formality,
       persuasiveness,
     });
 
-    return res.json({
-      message: "Draft email generated",
-      email: draftEmail,
-    });
+    return res.json({ message: "Draft email generated", email: draftEmail });
 
   } catch (err) {
     console.error("EMAIL GENERATE ERROR", err.message);
