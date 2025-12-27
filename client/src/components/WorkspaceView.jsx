@@ -1,141 +1,69 @@
-import { useState } from "react";
-import { Plus, Pencil } from "lucide-react";
+import { useEffect, useState } from "react";
+import RecipientCard from "@/components/RecipientCard";
+import ReceiverEmailComposer from "@/components/ReceiverEmailComposer";
+import { apiRequest } from "@/lib/api";
 
-import ReceiverEmailComposer from "./ReceiverEmailComposer";
-import RecipientCard from "./RecipientCard";
-import SenderContextModal from "./SenderContextModal";
-
-export default function WorkspaceView() {
-  /* ---------- DATA ---------- */
-  const [senderContext, setSenderContext] = useState(null);
+export default function WorkspaceView({ workspaceId }) {
   const [recipients, setRecipients] = useState([]);
+  const [composerOpen, setComposerOpen] = useState(false);
 
-  /* ---------- CONTEXT MODAL ---------- */
-  const [isContextOpen, setContextOpen] = useState(false);
-
-  /* ---------- COMPOSER ---------- */
-  const [isComposerOpen, setComposerOpen] = useState(false);
-  const [composerMode, setComposerMode] = useState("compose"); // compose | view
-  const [editingRecipient, setEditingRecipient] = useState(null);
-
-  /* ---------- ACTIONS ---------- */
-  const openNewComposer = () => {
-    setEditingRecipient(null);
-    setComposerMode("compose");
-    setComposerOpen(true);
+  /* ---------- Fetch workspace recipients ---------- */
+  const fetchRecipients = async () => {
+    const res = await apiRequest(`/workspace/${workspaceId}/recipients`);
+    setRecipients(res.recipients);
   };
 
-  const openExistingRecipient = (recipient) => {
-    setEditingRecipient(recipient);
-    setComposerMode(recipient.email.status === "draft" ? "compose" : "view");
-    setComposerOpen(true);
-  };
+  useEffect(() => {
+    fetchRecipients();
+  }, [workspaceId]);
 
-  const closeComposer = () => {
-    setComposerOpen(false);
-    setEditingRecipient(null);
-    setComposerMode("compose");
-  };
-
-  const upsertRecipient = ({ recipient, xHandle, notes, email }) => {
+  /* ---------- Draft saved callback ---------- */
+  const handleDraftSaved = (email) => {
     setRecipients((prev) => {
-      if (recipient) {
-        return prev.map((r) =>
-          r.id === recipient.id ? { ...r, xHandle, notes, email } : r
-        );
+      const index = prev.findIndex((r) => r._id === email.recipientId);
+
+      // New recipient → add card
+      if (index === -1) {
+        return [
+          {
+            _id: email.recipientId,
+            email,
+          },
+          ...prev,
+        ];
       }
 
-      return [
-        {
-          id: crypto.randomUUID(),
-          xHandle,
-          notes,
-          email,
-          createdAt: new Date().toISOString(),
-        },
-        ...prev,
-      ];
+      // Existing recipient → update card
+      const updated = [...prev];
+      updated[index] = {
+        ...updated[index],
+        email,
+      };
+      return updated;
     });
-
-    closeComposer();
   };
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 p-8">
-      {/* ---------- HEADER ---------- */}
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-xl font-semibold">Workspace</h1>
-          <p className="text-xs text-zinc-400">
-            One context, multiple recipients
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {/* CONTEXT BUTTON */}
-          <button
-            onClick={() => setContextOpen(true)}
-            className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-zinc-800 text-[11px] hover:bg-zinc-700"
-          >
-            <Pencil size={12} />
-            {senderContext ? "Edit Context" : "Add Context"}
-          </button>
-
-          {/* ADD RECIPIENT */}
-          <button
-            onClick={openNewComposer}
-            disabled={!senderContext}
-            className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-zinc-100 text-zinc-900 text-[11px] font-medium hover:bg-zinc-200 disabled:opacity-50"
-          >
-            <Plus size={12} />
-            Add Recipient
-          </button>
-        </div>
+    <div className="flex h-full">
+      {/* LEFT: Recipient Cards */}
+      <div className="w-[360px] border-r border-zinc-800 p-3 space-y-2">
+        {recipients.map((r) => (
+          <RecipientCard
+            key={r._id}
+            recipient={r}
+            email={r.email}
+            onClick={() => setComposerOpen(true)}
+          />
+        ))}
       </div>
 
-      {/* ---------- EMPTY STATE ---------- */}
-      {!recipients.length && (
-        <div className="border border-dashed border-zinc-800 rounded-xl p-10 text-center text-sm text-zinc-500">
-          {senderContext
-            ? "Add a recipient to generate an email"
-            : "Add a sender context to get started"}
-        </div>
-      )}
-
-      {/* ---------- RECIPIENT GRID ---------- */}
-      {recipients.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {recipients.map((r) => (
-            <RecipientCard
-              key={r.id}
-              recipient={r}
-              onClick={() => openExistingRecipient(r)}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* ---------- EMAIL COMPOSER MODAL ---------- */}
-      {isComposerOpen && (
-        <ReceiverEmailComposer
-          isOpen={isComposerOpen}
-          mode={composerMode}
-          senderContext={senderContext}
-          recipient={editingRecipient}
-          onClose={closeComposer}
-          onSaveDraft={upsertRecipient}
-          onSend={upsertRecipient}
-        />
-      )}
-
-      {/* ---------- CONTEXT MODAL ---------- */}
-      <SenderContextModal
-        isOpen={isContextOpen}
-        onClose={() => setContextOpen(false)}
-        onSave={(ctx) => {
-          setSenderContext(ctx);
-          setContextOpen(false);
-        }}
+      {/* RIGHT: Composer */}
+      <ReceiverEmailComposer
+        isOpen={composerOpen}
+        onClose={() => setComposerOpen(false)}
+        workspaceId={workspaceId}
+        senderContext={true}
+        onDraftSaved={handleDraftSaved} // 🔑 critical
       />
     </div>
   );

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import Sidebar from "@/components/Sidebar";
 import WorkspacePage from "@/pages/WorkspacePage";
 import SenderContextModal from "@/components/SenderContextModal";
+import ReceiverEmailComposer from "@/components/ReceiverEmailComposer";
 import { apiRequest } from "@/lib/api";
 
 export default function AppShell() {
@@ -10,12 +11,16 @@ export default function AppShell() {
 
   const [workspaces, setWorkspaces] = useState([]);
   const [activeWorkspaceId, setActiveWorkspaceId] = useState(null);
+  const [senderContext, setSenderContext] = useState(null);
+
   const [showContextModal, setShowContextModal] = useState(false);
+  const [showReceiverComposer, setShowReceiverComposer] = useState(false);
+
   const [loading, setLoading] = useState(true);
 
   /* ---------- LOAD WORKSPACES ---------- */
   useEffect(() => {
-    async function load() {
+    async function loadWorkspaces() {
       try {
         const res = await apiRequest("/workspace");
         const list = Array.isArray(res) ? res : res.workspaces || [];
@@ -35,12 +40,29 @@ export default function AppShell() {
       }
     }
 
-    load();
+    loadWorkspaces();
   }, [navigate]);
+
+  /* ---------- LOAD SENDER CONTEXT PER WORKSPACE ---------- */
+  useEffect(() => {
+    async function loadSenderContext() {
+      if (!activeWorkspaceId) return;
+
+      try {
+        const res = await apiRequest(`/context/${activeWorkspaceId}`);
+        setSenderContext(res || null);
+      } catch {
+        setSenderContext(null);
+      }
+    }
+
+    loadSenderContext();
+  }, [activeWorkspaceId]);
 
   /* ---------- CLOSE MODALS ON WORKSPACE SWITCH ---------- */
   useEffect(() => {
     setShowContextModal(false);
+    setShowReceiverComposer(false);
   }, [activeWorkspaceId]);
 
   /* ---------- LOGOUT ---------- */
@@ -51,7 +73,7 @@ export default function AppShell() {
     navigate("/login", { replace: true });
   };
 
-  /* ---------- LOADING STATE ---------- */
+  /* ---------- LOADING ---------- */
   if (loading) {
     return (
       <div className="h-screen bg-zinc-950 flex items-center justify-center text-zinc-400">
@@ -60,7 +82,6 @@ export default function AppShell() {
     );
   }
 
-  /* ---------- ACTIVE WORKSPACE GUARD ---------- */
   const activeWorkspace = workspaces.find((w) => w._id === activeWorkspaceId);
 
   if (!activeWorkspace) return null;
@@ -73,15 +94,31 @@ export default function AppShell() {
         activeWorkspaceId={activeWorkspaceId}
         onSwitchWorkspace={setActiveWorkspaceId}
         onAddContext={() => setShowContextModal(true)}
-        onAddRecipient={() => {}}
+        onAddRecipient={() => setShowReceiverComposer(true)}
         onLogout={handleLogout}
       />
 
+      {/* Sender Context Modal */}
       <SenderContextModal
         isOpen={showContextModal}
         workspaceId={activeWorkspaceId}
         onClose={() => setShowContextModal(false)}
-        onSaved={() => setShowContextModal(false)}
+        onSaved={() => {
+          setShowContextModal(false);
+          // refresh context after save
+          apiRequest(`/context/${activeWorkspaceId}`)
+            .then(setSenderContext)
+            .catch(() => setSenderContext(null));
+        }}
+      />
+
+      {/* Receiver Email Composer */}
+      <ReceiverEmailComposer
+        isOpen={showReceiverComposer}
+        onClose={() => setShowReceiverComposer(false)}
+        onSaved={() => setShowReceiverComposer(false)}
+        workspaceId={activeWorkspaceId}
+        senderContext={senderContext}
       />
 
       <main className="flex-1 overflow-y-auto">

@@ -1,8 +1,13 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
+import EmailCard from "@/components/EmailCard";
+import ReceiverEmailComposer from "@/components/ReceiverEmailComposer";
 
 export default function WorkspacePage({ workspace }) {
-  // HARD GUARD — prevents white screen
+  const [emails, setEmails] = useState([]);
+  const [composerOpen, setComposerOpen] = useState(false);
+
   if (!workspace) {
     return (
       <div className="h-full flex items-center justify-center text-zinc-400">
@@ -11,9 +16,14 @@ export default function WorkspacePage({ workspace }) {
     );
   }
 
+  // This function receives the email object from the composer
+  const handleAddEmail = (newEmail) => {
+    setEmails((prev) => [newEmail, ...prev]);
+  };
+
   return (
     <div className="p-6 space-y-6">
-      {/* ================= HEADER ================= */}
+      {/* HEADER */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-white">
@@ -22,42 +32,43 @@ export default function WorkspacePage({ workspace }) {
           <p className="text-sm text-zinc-400">Workspace</p>
         </div>
 
-        <Button
-          size="sm"
-          className="
-            flex items-center gap-2
-            hover:cursor-pointer
-          "
-        >
+        <Button size="sm" onClick={() => setComposerOpen(true)}>
           <Plus size={16} />
-          Add Recipient
+          Compose Email
         </Button>
       </div>
 
-      {/* ================= STATS / PLACEHOLDER ================= */}
+      {/* STATS */}
       <div className="grid grid-cols-3 gap-4">
-        <StatCard label="Recipients" value="0" />
-        <StatCard label="Emails Sent" value="0" />
+        <StatCard label="Recipients" value={emails.length} />
+        <StatCard
+          label="Emails Sent"
+          value={emails.filter((e) => e.status === "sent").length}
+        />
         <StatCard label="Open Rate" value="—" />
       </div>
 
-      {/* ================= EMPTY STATE ================= */}
-      <div className="border border-dashed border-zinc-700 rounded-xl p-12 text-center text-zinc-400">
-        <p className="text-lg mb-2">No recipients yet</p>
-        <p className="text-sm mb-4">
-          Add a recipient to generate and send personalized emails.
-        </p>
-
-        <Button variant="secondary" className="hover:cursor-pointer">
-          <Plus size={16} />
-          Add your first recipient
-        </Button>
+      {/* EMAIL LIST */}
+      <div className="space-y-3">
+        {emails.length === 0 ? (
+          <div className="border border-dashed border-zinc-700 rounded-xl p-12 text-center text-zinc-400">
+            No emails yet
+          </div>
+        ) : (
+          emails.map((email) => <EmailCard key={email.id} email={email} />)
+        )}
       </div>
+
+      {/* COMPOSER */}
+      <ReceiverEmailComposer
+        isOpen={composerOpen}
+        onClose={() => setComposerOpen(false)}
+        workspaceId={workspace._id}
+        onAddEmail={handleAddEmail} // Correctly passed
+      />
     </div>
   );
 }
-
-/* ================= SMALL COMPONENT ================= */
 
 function StatCard({ label, value }) {
   return (
